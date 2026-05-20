@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Todo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <style>
+    :root {
+      --bg:        #0f1117;
+      --surface:   #1a1d27;
+      --surface2:  #222535;
+      --border:    rgba(255,255,255,0.07);
+      --text:      #e8eaf0;
+      --text-sub:  #7b7f94;
+      --text-mute: #4a4e63;
+      --accent:    #6366f1;
+      --accent-h:  #818cf8;
+      --high:      #f87171;
+      --med:       #fbbf24;
+      --low:       #34d399;
+      --done-text: #4a4e63;
+      --radius:    14px;
+      --radius-sm: 8px;
+      --shadow:    0 4px 24px rgba(0,0,0,0.35);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 48px 16px 80px;
+    }
+
+    .wrap { width: 100%; max-width: 620px; display: flex; flex-direction: column; gap: 20px; }
+
+    /* ── Header ── */
+    .header { display: flex; flex-direction: column; gap: 4px; }
+    .header-top { display: flex; align-items: flex-end; justify-content: space-between; }
+    .logo {
+      font-size: 1.75rem; font-weight: 700; letter-spacing: -0.04em;
+      background: linear-gradient(135deg, #818cf8 0%, #a78bfa 60%, #f472b6 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .date-label { font-size: 0.78rem; color: var(--text-sub); font-weight: 400; padding-bottom: 2px; }
+    .progress-wrap { background: var(--surface2); border-radius: 99px; height: 5px; overflow: hidden; }
+    .progress-bar {
+      height: 100%; border-radius: 99px;
+      background: linear-gradient(90deg, #6366f1, #a78bfa);
+      transition: width 0.4s cubic-bezier(.4,0,.2,1);
+    }
+    .progress-text { font-size: 0.75rem; color: var(--text-sub); text-align: right; margin-top: 4px; }
+
+    /* ── User bar ── */
+    .user-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 8px 12px;
+    }
+    .user-email { font-size: 0.78rem; color: var(--text-sub); }
+    .user-email span { color: var(--text); font-weight: 500; }
+    .signout-btn {
+      font-size: 0.75rem; color: var(--text-mute); background: none; border: none;
+      cursor: pointer; font-family: inherit; padding: 2px 8px; border-radius: 6px;
+      transition: all 0.15s;
+    }
+    .signout-btn:hover { color: var(--high); background: rgba(248,113,113,0.08); }
+
+    /* ── Status bar ── */
+    .status-bar {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 0.73rem; color: var(--text-mute); padding: 2px 0 0; min-height: 18px;
+    }
+    .status-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--text-mute); flex-shrink: 0; transition: background 0.3s;
+    }
+    .status-dot.ok    { background: var(--low); }
+    .status-dot.error { background: var(--high); }
+    .status-dot.busy  { background: var(--med); animation: pulse 1s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* ── Add form ── */
+    .add-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px;
+      display: flex; flex-direction: column; gap: 10px; box-shadow: var(--shadow);
+    }
+    .add-row { display: flex; gap: 8px; }
+    .add-input {
+      flex: 1; background: var(--surface2); border: 1.5px solid transparent;
+      border-radius: var(--radius-sm); color: var(--text); font-family: inherit;
+      font-size: 0.95rem; padding: 10px 14px; outline: none; transition: border-color 0.15s;
+    }
+    .add-input::placeholder { color: var(--text-mute); }
+    .add-input:focus { border-color: var(--accent); }
+    .add-btn {
+      background: var(--accent); color: #fff; border: none;
+      border-radius: var(--radius-sm); padding: 10px 18px;
+      font-size: 1.25rem; font-weight: 600; cursor: pointer;
+      transition: background 0.15s, transform 0.1s; line-height: 1; flex-shrink: 0;
+    }
+    .add-btn:hover  { background: var(--accent-h); }
+    .add-btn:active { transform: scale(0.95); }
+
+    .priority-row { display: flex; gap: 6px; align-items: center; }
+    .priority-label { font-size: 0.75rem; color: var(--text-sub); margin-right: 2px; font-weight: 500; }
+    .pri-btn {
+      padding: 4px 12px; border-radius: 99px; border: 1.5px solid transparent;
+      font-size: 0.75rem; font-weight: 600; cursor: pointer;
+      background: var(--surface2); color: var(--text-sub); transition: all 0.15s; letter-spacing: 0.02em;
+    }
+    .pri-btn[data-p="high"]   { border-color: rgba(248,113,113,0.3); color: var(--high); }
+    .pri-btn[data-p="medium"] { border-color: rgba(251,191,36,0.3);  color: var(--med); }
+    .pri-btn[data-p="low"]    { border-color: rgba(52,211,153,0.3);   color: var(--low); }
+    .pri-btn.selected[data-p="high"]   { background: rgba(248,113,113,0.15); border-color: var(--high); }
+    .pri-btn.selected[data-p="medium"] { background: rgba(251,191,36,0.15);  border-color: var(--med); }
+    .pri-btn.selected[data-p="low"]    { background: rgba(52,211,153,0.15);   border-color: var(--low); }
+
+    /* ── Toolbar ── */
+    .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .filter-group {
+      display: flex; gap: 4px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 99px; padding: 4px;
+    }
+    .filter-btn {
+      padding: 5px 14px; border-radius: 99px; border: none; background: transparent;
+      color: var(--text-sub); font-family: inherit; font-size: 0.78rem;
+      font-weight: 500; cursor: pointer; transition: all 0.15s;
+    }
+    .filter-btn.active { background: var(--accent); color: #fff; }
+    .sort-btn {
+      display: flex; align-items: center; gap: 5px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 99px;
+      padding: 5px 14px; color: var(--text-sub); font-family: inherit;
+      font-size: 0.78rem; font-weight: 500; cursor: pointer; transition: all 0.15s;
+    }
+    .sort-btn:hover, .sort-btn.active { color: var(--text); border-color: var(--accent); }
+    .sort-btn svg { width: 13px; height: 13px; }
+
+    /* ── Todo list ── */
+    .todo-list { display: flex; flex-direction: column; gap: 8px; }
+
+    /* ── Todo item ── */
+    .item {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 14px 14px 12px;
+      position: relative; overflow: hidden;
+      transition: box-shadow 0.2s, border-color 0.2s, opacity 0.2s; cursor: default;
+    }
+    .item::before {
+      content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+      border-radius: 99px 0 0 99px; background: var(--item-color, var(--text-mute));
+      transition: background 0.2s;
+    }
+    .item[data-p="high"]   { --item-color: var(--high); }
+    .item[data-p="medium"] { --item-color: var(--med); }
+    .item[data-p="low"]    { --item-color: var(--low); }
+    .item:hover { border-color: rgba(255,255,255,0.12); box-shadow: 0 2px 16px rgba(0,0,0,0.3); }
+    .item.dragging  { opacity: 0.35; }
+    .item.drag-over { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(99,102,241,0.35); }
+
+    .drag-handle {
+      color: var(--text-mute); cursor: grab; padding: 4px 2px; flex-shrink: 0;
+      transition: color 0.15s; touch-action: none; display: flex; align-items: center;
+    }
+    .drag-handle:hover { color: var(--text-sub); }
+    .drag-handle:active { cursor: grabbing; }
+    .drag-handle svg { width: 14px; height: 14px; display: block; }
+
+    .cb-wrap { flex-shrink: 0; width: 20px; height: 20px; position: relative; cursor: pointer; }
+    .cb-wrap input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .cb-box {
+      width: 20px; height: 20px; border-radius: 6px;
+      border: 2px solid var(--item-color, var(--text-mute));
+      background: transparent; display: flex; align-items: center; justify-content: center;
+      transition: all 0.18s;
+    }
+    .cb-wrap input:checked ~ .cb-box { background: var(--item-color, var(--accent)); border-color: var(--item-color, var(--accent)); }
+    .cb-check { opacity: 0; transform: scale(0.5); transition: all 0.18s; }
+    .cb-wrap input:checked ~ .cb-box .cb-check { opacity: 1; transform: scale(1); }
+
+    .item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+    .item-text {
+      font-size: 0.92rem; font-weight: 500; color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      transition: color 0.2s; cursor: text;
+    }
+    .item-text.done { color: var(--done-text); text-decoration: line-through; text-decoration-color: var(--text-mute); }
+    .item-edit {
+      font-family: inherit; font-size: 0.92rem; font-weight: 500;
+      background: var(--surface2); border: 1.5px solid var(--accent);
+      border-radius: 6px; color: var(--text); padding: 3px 8px; outline: none; width: 100%;
+    }
+    .item-meta { display: flex; align-items: center; gap: 6px; }
+    .pri-badge {
+      font-size: 0.65rem; font-weight: 700; letter-spacing: 0.06em;
+      text-transform: uppercase; padding: 1px 7px; border-radius: 99px;
+    }
+    .pri-badge[data-p="high"]   { background: rgba(248,113,113,0.15); color: var(--high); }
+    .pri-badge[data-p="medium"] { background: rgba(251,191,36,0.15);  color: var(--med); }
+    .pri-badge[data-p="low"]    { background: rgba(52,211,153,0.15);   color: var(--low); }
+
+    .item-actions { display: flex; gap: 2px; flex-shrink: 0; }
+    .act-btn {
+      width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+      border: none; border-radius: 6px; background: transparent; color: var(--text-mute);
+      cursor: pointer; transition: all 0.15s;
+    }
+    .act-btn:hover { background: var(--surface2); color: var(--text-sub); }
+    .act-btn.del:hover { background: rgba(248,113,113,0.1); color: var(--high); }
+    .act-btn svg { width: 14px; height: 14px; display: block; }
+
+    /* ── Empty state ── */
+    .empty {
+      text-align: center; padding: 56px 0; display: flex;
+      flex-direction: column; align-items: center; gap: 12px;
+    }
+    .empty-icon {
+      width: 56px; height: 56px; background: var(--surface2); border-radius: 16px;
+      display: flex; align-items: center; justify-content: center; font-size: 1.6rem;
+    }
+    .empty h3 { font-size: 1rem; font-weight: 600; color: var(--text-sub); }
+    .empty p  { font-size: 0.82rem; color: var(--text-mute); }
+
+    /* ── Footer ── */
+    .footer { display: flex; justify-content: space-between; align-items: center; padding-top: 4px; }
+    .footer-count { font-size: 0.78rem; color: var(--text-sub); }
+    .clear-btn {
+      font-size: 0.78rem; color: var(--high); background: none; border: none;
+      cursor: pointer; padding: 3px 8px; border-radius: 6px; font-family: inherit;
+      opacity: 0.7; transition: opacity 0.15s, background 0.15s;
+    }
+    .clear-btn:hover { opacity: 1; background: rgba(248,113,113,0.08); }
+
+    @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+    .item { animation: slideIn 0.2s ease; }
+
+    /* ── Auth overlay ── */
+    .auth-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 100; backdrop-filter: blur(6px);
+    }
+    .auth-overlay.hidden { display: none; }
+    .auth-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 32px 28px;
+      width: 100%; max-width: 400px;
+      display: flex; flex-direction: column; gap: 20px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+    }
+    .auth-logo {
+      font-size: 1.4rem; font-weight: 700; letter-spacing: -0.04em; text-align: center;
+      background: linear-gradient(135deg, #818cf8 0%, #a78bfa 60%, #f472b6 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+
+    /* Tab */
+    .auth-tabs { display: flex; background: var(--surface2); border-radius: 10px; padding: 4px; gap: 4px; }
+    .auth-tab {
+      flex: 1; padding: 8px; border: none; border-radius: 7px;
+      background: transparent; color: var(--text-sub); font-family: inherit;
+      font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: all 0.15s;
+    }
+    .auth-tab.active { background: var(--accent); color: #fff; }
+
+    /* Fields */
+    .auth-fields { display: flex; flex-direction: column; gap: 10px; }
+    .auth-field { display: flex; flex-direction: column; gap: 5px; }
+    .auth-field label { font-size: 0.75rem; color: var(--text-sub); font-weight: 500; }
+    .auth-field input {
+      background: var(--surface2); border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm); color: var(--text); font-family: inherit;
+      font-size: 0.9rem; padding: 10px 14px; outline: none; transition: border-color 0.15s;
+    }
+    .auth-field input:focus { border-color: var(--accent); }
+
+    .auth-submit {
+      background: var(--accent); color: #fff; border: none;
+      border-radius: var(--radius-sm); padding: 12px;
+      font-family: inherit; font-size: 0.9rem; font-weight: 600;
+      cursor: pointer; transition: background 0.15s, opacity 0.15s;
+    }
+    .auth-submit:hover { background: var(--accent-h); }
+    .auth-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .auth-msg {
+      font-size: 0.8rem; text-align: center; padding: 8px 12px;
+      border-radius: var(--radius-sm); display: none;
+    }
+    .auth-msg.error   { display: block; background: rgba(248,113,113,0.1); color: var(--high); }
+    .auth-msg.success { display: block; background: rgba(52,211,153,0.1);  color: var(--low); }
+
+    /* ── Social login ── */
+    .auth-divider {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 0.75rem; color: var(--text-mute);
+    }
+    .auth-divider::before, .auth-divider::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+    .social-btns { display: flex; flex-direction: column; gap: 8px; }
+    .social-btn {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      padding: 11px 16px; border-radius: var(--radius-sm);
+      border: 1.5px solid var(--border); background: var(--surface2);
+      color: var(--text); font-family: inherit; font-size: 0.88rem;
+      font-weight: 500; cursor: pointer; transition: all 0.15s;
+    }
+    .social-btn:hover { border-color: rgba(255,255,255,0.2); background: #2a2d3e; }
+    .social-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+    .social-btn.github:hover { border-color: #6e7681; }
+    .social-btn.google:hover { border-color: #4285f4; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-top">
+      <div class="logo">Todo</div>
+      <div class="date-label" id="dateLabel"></div>
+    </div>
+    <div class="progress-wrap"><div class="progress-bar" id="progressBar" style="width:0%"></div></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+      <div class="status-bar">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">연결 중...</span>
+      </div>
+      <div class="progress-text" id="progressText"></div>
+    </div>
+  </div>
+
+  <!-- User bar (로그인 후 표시) -->
+  <div class="user-bar hidden" id="userBar">
+    <div class="user-email">로그인: <span id="userEmail"></span></div>
+    <button class="signout-btn" id="signoutBtn">로그아웃</button>
+  </div>
+
+  <!-- Add form -->
+  <div class="add-card">
+    <div class="add-row">
+      <input class="add-input" id="newTodo" type="text" placeholder="새로운 할 일 추가..." maxlength="200" autocomplete="off">
+      <button class="add-btn" id="addBtn">+</button>
+    </div>
+    <div class="priority-row">
+      <span class="priority-label">우선순위</span>
+      <button class="pri-btn selected" data-p="high">높음</button>
+      <button class="pri-btn" data-p="medium">보통</button>
+      <button class="pri-btn" data-p="low">낮음</button>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="filter-group">
+      <button class="filter-btn active" data-filter="all">전체</button>
+      <button class="filter-btn" data-filter="active">미완료</button>
+      <button class="filter-btn" data-filter="done">완료</button>
+    </div>
+    <button class="sort-btn" id="sortBtn">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <path d="M2 4h12M4 8h8M6 12h4"/>
+      </svg>
+      우선순위순
+    </button>
+  </div>
+
+  <!-- List -->
+  <div class="todo-list" id="todoList"></div>
+
+  <!-- Footer -->
+  <div class="footer" id="footer"></div>
+
+</div>
+
+<!-- Auth overlay -->
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-box">
+    <div class="auth-logo">Todo</div>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" data-tab="login">로그인</button>
+      <button class="auth-tab" data-tab="signup">회원가입</button>
+    </div>
+
+    <div class="auth-fields">
+      <div class="auth-field">
+        <label>이메일</label>
+        <input id="authEmail" type="email" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="auth-field">
+        <label>비밀번호</label>
+        <input id="authPassword" type="password" placeholder="6자 이상" autocomplete="current-password">
+      </div>
+    </div>
+
+    <div class="auth-msg" id="authMsg"></div>
+
+    <button class="auth-submit" id="authSubmit">로그인</button>
+
+    <div class="auth-divider">또는 소셜 계정으로 계속</div>
+
+    <div class="social-btns">
+      <button class="social-btn github" id="btnGithub">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+        </svg>
+        GitHub으로 계속하기
+      </button>
+      <button class="social-btn google" id="btnGoogle">
+        <svg viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+        </svg>
+        Google로 계속하기
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL  = 'https://tfakzxaygrvvzmtgqwhr.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRmYWt6eGF5Z3J2dnptdGdxd2hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyMTcwNzUsImV4cCI6MjA5NDc5MzA3NX0.Nzm5Rs0j7zdiQg50T2iu6xlqFfznIMrKHedWg3Zp7R8';
+const REDIRECT_URL  = 'https://sarangks2-commits.github.io/todo/';
+
+const PRI_ORDER = { high: 0, medium: 1, low: 2 };
+const PRI_LABEL = { high: '높음', medium: '보통', low: '낮음' };
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+let userId    = null;
+let todos     = [];
+let filter    = 'all';
+let sortByPri = false;
+let selPri    = 'high';
+let editingId = null;
+let dragSrcId = null;
+let busy      = false;
+let authMode  = 'login';  // 'login' | 'signup'
+
+/* ── 유틸 ── */
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function setStatus(state, text) {
+  document.getElementById('statusDot').className = 'status-dot ' + state;
+  document.getElementById('statusText').textContent = text;
+}
+function showAuthMsg(type, text) {
+  const el = document.getElementById('authMsg');
+  el.className = 'auth-msg ' + type;
+  el.textContent = text;
+}
+function clearAuthMsg() {
+  const el = document.getElementById('authMsg');
+  el.className = 'auth-msg';
+  el.textContent = '';
+}
+
+/* ── Auth UI ── */
+function showAuthOverlay() {
+  document.getElementById('authOverlay').classList.remove('hidden');
+}
+function hideAuthOverlay() {
+  document.getElementById('authOverlay').classList.add('hidden');
+}
+function showUserBar(email) {
+  document.getElementById('userBar').classList.remove('hidden');
+  document.getElementById('userEmail').textContent = email;
+}
+function hideUserBar() {
+  document.getElementById('userBar').classList.add('hidden');
+}
+
+/* ── Auth 탭 전환 ── */
+document.querySelectorAll('.auth-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    authMode = btn.dataset.tab;
+    document.querySelectorAll('.auth-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('authSubmit').textContent = authMode === 'login' ? '로그인' : '회원가입';
+    clearAuthMsg();
+  });
+});
+
+/* ── 로그인 / 회원가입 ── */
+document.getElementById('authSubmit').addEventListener('click', async () => {
+  const email    = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  if (!email || !password) { showAuthMsg('error', '이메일과 비밀번호를 입력해주세요.'); return; }
+
+  const btn = document.getElementById('authSubmit');
+  btn.disabled = true;
+  clearAuthMsg();
+
+  if (authMode === 'signup') {
+    const { error } = await sb.auth.signUp({ email, password });
+    btn.disabled = false;
+    if (error) { showAuthMsg('error', error.message); return; }
+    showAuthMsg('success', '가입 완료! 이메일로 확인 링크가 발송되었습니다. 확인 후 로그인해주세요.');
+  } else {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    btn.disabled = false;
+    if (error) { showAuthMsg('error', error.message); return; }
+    await onSignedIn(data.user);
+  }
+});
+
+/* ── Enter 키 submit ── */
+['authEmail', 'authPassword'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('authSubmit').click();
+  });
+});
+
+/* ── 소셜 로그인 ── */
+document.getElementById('btnGithub').addEventListener('click', async () => {
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'github',
+    options: { redirectTo: REDIRECT_URL },
+  });
+  if (error) showAuthMsg('error', error.message);
+});
+
+document.getElementById('btnGoogle').addEventListener('click', async () => {
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: REDIRECT_URL },
+  });
+  if (error) showAuthMsg('error', error.message);
+});
+
+/* ── 로그아웃 ── */
+document.getElementById('signoutBtn').addEventListener('click', async () => {
+  await sb.auth.signOut();
+  userId = null;
+  todos  = [];
+  hideUserBar();
+  setStatus('error', '로그아웃됨');
+  render();
+  showAuthOverlay();
+});
+
+/* ── 로그인 완료 후 처리 ── */
+async function onSignedIn(user) {
+  userId = user.id;
+  hideAuthOverlay();
+  showUserBar(user.email);
+  setStatus('ok', '연결됨');
+  await loadTodos();
+}
+
+/* ── CRUD ── */
+async function loadTodos() {
+  const { data, error } = await sb
+    .from('todos').select('*')
+    .eq('user_id', userId)
+    .order('position', { ascending: true });
+  if (error) { setStatus('error', error.message); return; }
+  todos = data;
+  render();
+}
+
+async function addTodo(text) {
+  text = text.trim();
+  if (!text || busy) return;
+  busy = true;
+  const maxPos = todos.length ? Math.min(...todos.map(t => t.position)) - 1 : 0;
+  const { error } = await sb.from('todos').insert({
+    user_id: userId, text, done: false, priority: selPri, position: maxPos,
+  });
+  busy = false;
+  if (error) { setStatus('error', error.message); return; }
+  await loadTodos();
+}
+
+async function toggleDone(id) {
+  const t = todos.find(t => t.id === id);
+  if (!t) return;
+  const { error } = await sb.from('todos').update({ done: !t.done }).eq('id', id);
+  if (error) { setStatus('error', error.message); return; }
+  await loadTodos();
+}
+
+async function deleteTodo(id) {
+  const { error } = await sb.from('todos').delete().eq('id', id);
+  if (error) { setStatus('error', error.message); return; }
+  await loadTodos();
+}
+
+async function finishEdit(id, val) {
+  val = val.trim();
+  editingId = null;
+  if (!val) { render(); return; }
+  const { error } = await sb.from('todos').update({ text: val }).eq('id', id);
+  if (error) setStatus('error', error.message);
+  await loadTodos();
+}
+
+async function clearDone() {
+  const ids = todos.filter(t => t.done).map(t => t.id);
+  if (!ids.length) return;
+  const { error } = await sb.from('todos').delete().in('id', ids);
+  if (error) { setStatus('error', error.message); return; }
+  await loadTodos();
+}
+
+async function reorderAndSave(newOrder) {
+  todos = newOrder;
+  render();
+  const results = await Promise.all(
+    newOrder.map((t, i) => sb.from('todos').update({ position: i }).eq('id', t.id))
+  );
+  const err = results.find(r => r.error)?.error;
+  if (err) { setStatus('error', err.message); return; }
+  await loadTodos();
+}
+
+async function moveItem(id, dir) {
+  const arr = [...todos];
+  const i = arr.findIndex(t => t.id === id);
+  const j = i + dir;
+  if (j < 0 || j >= arr.length) return;
+  [arr[i], arr[j]] = [arr[j], arr[i]];
+  await reorderAndSave(arr);
+}
+
+/* ── Drag & Drop ── */
+function onDragStart(e, id) {
+  dragSrcId = id;
+  e.dataTransfer.effectAllowed = 'move';
+  requestAnimationFrame(() => e.target.closest('.item')?.classList.add('dragging'));
+}
+function onDragEnd() {
+  document.querySelectorAll('.item').forEach(el => el.classList.remove('dragging', 'drag-over'));
+}
+function onDragOver(e, id) {
+  e.preventDefault();
+  document.querySelectorAll('.item').forEach(el => el.classList.remove('drag-over'));
+  const el = document.querySelector(`.item[data-id="${id}"]`);
+  if (el && id !== dragSrcId) el.classList.add('drag-over');
+}
+async function onDrop(e, targetId) {
+  e.preventDefault();
+  if (!dragSrcId || dragSrcId === targetId) return;
+  const arr = [...todos];
+  const si = arr.findIndex(t => t.id === dragSrcId);
+  const ti = arr.findIndex(t => t.id === targetId);
+  if (si < 0 || ti < 0) return;
+  const [item] = arr.splice(si, 1);
+  arr.splice(ti, 0, item);
+  dragSrcId = null;
+  await reorderAndSave(arr);
+}
+
+/* ── Render ── */
+function startEdit(id) { editingId = id; render(); }
+
+function render() {
+  const list  = document.getElementById('todoList');
+  const foot  = document.getElementById('footer');
+  const pBar  = document.getElementById('progressBar');
+  const pText = document.getElementById('progressText');
+
+  let visible = todos.filter(t =>
+    filter === 'all' ? true : filter === 'active' ? !t.done : t.done
+  );
+  if (sortByPri) {
+    visible = [...visible].sort((a,b) =>
+      PRI_ORDER[a.priority ?? 'medium'] - PRI_ORDER[b.priority ?? 'medium']
+    );
+  }
+
+  const total = todos.length, doneN = todos.filter(t => t.done).length;
+  const pct = total ? Math.round(doneN / total * 100) : 0;
+  pBar.style.width = pct + '%';
+  pText.textContent = total ? `${doneN} / ${total} 완료 (${pct}%)` : '';
+
+  if (visible.length === 0) {
+    list.innerHTML = `
+      <div class="empty">
+        <div class="empty-icon">✓</div>
+        <h3>${filter === 'done' ? '완료된 항목이 없어요' : '할 일이 없어요'}</h3>
+        <p>${filter === 'all' ? '위에서 새 할 일을 추가해보세요' : ''}</p>
+      </div>`;
+  } else {
+    list.innerHTML = visible.map(t => {
+      const p = t.priority ?? 'medium';
+      const isEditing = t.id === editingId;
+      const isFirst   = visible[0].id === t.id;
+      const isLast    = visible[visible.length - 1].id === t.id;
+      return `
+        <div class="item" data-id="${t.id}" data-p="${p}"
+          draggable="true"
+          ondragstart="onDragStart(event,'${t.id}')"
+          ondragend="onDragEnd()"
+          ondragover="onDragOver(event,'${t.id}')"
+          ondrop="onDrop(event,'${t.id}')">
+          <div class="drag-handle" title="드래그하여 순서 변경">
+            <svg viewBox="0 0 16 16" fill="currentColor">
+              <rect x="4" y="3"  width="8" height="1.5" rx="0.75"/>
+              <rect x="4" y="7"  width="8" height="1.5" rx="0.75"/>
+              <rect x="4" y="11" width="8" height="1.5" rx="0.75"/>
+            </svg>
+          </div>
+          <label class="cb-wrap">
+            <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleDone('${t.id}')">
+            <div class="cb-box">
+              <svg class="cb-check" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round" width="12" height="12">
+                <polyline points="2,6 5,9 10,3"/>
+              </svg>
+            </div>
+          </label>
+          <div class="item-body">
+            ${isEditing
+              ? `<input class="item-edit" id="edit_${t.id}" value="${esc(t.text)}"
+                   onblur="finishEdit('${t.id}', this.value)"
+                   onkeydown="if(event.key==='Enter')this.blur();if(event.key==='Escape'){editingId=null;render()}">`
+              : `<div class="item-text ${t.done ? 'done' : ''}"
+                      ondblclick="startEdit('${t.id}')"
+                      title="${esc(t.text)}">${esc(t.text)}</div>`
+            }
+            <div class="item-meta">
+              <span class="pri-badge" data-p="${p}">${PRI_LABEL[p]}</span>
+            </div>
+          </div>
+          <div class="item-actions">
+            <button class="act-btn" onclick="moveItem('${t.id}',-1)" title="위로"
+              ${isFirst ? 'disabled style="opacity:.2"' : ''}>
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,10 8,6 12,10"/></svg>
+            </button>
+            <button class="act-btn" onclick="moveItem('${t.id}',1)" title="아래로"
+              ${isLast ? 'disabled style="opacity:.2"' : ''}>
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,6 8,10 12,6"/></svg>
+            </button>
+            <button class="act-btn" onclick="startEdit('${t.id}')" title="수정">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 2.5a1.41 1.41 0 0 1 2 2L5 13l-3 1 1-3 8.5-8.5z"/></svg>
+            </button>
+            <button class="act-btn del" onclick="deleteTodo('${t.id}')" title="삭제">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,4 14,4"/><path d="M5 4V2h6v2"/><path d="M6 7v5M10 7v5"/><rect x="3" y="4" width="10" height="10" rx="2"/></svg>
+            </button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  if (editingId) {
+    const el = document.getElementById(`edit_${editingId}`);
+    if (el) { el.focus(); el.select(); }
+  }
+
+  const active = todos.filter(t => !t.done).length;
+  foot.innerHTML = total === 0 ? '' : `
+    <span class="footer-count">미완료 <strong>${active}</strong>개</span>
+    ${doneN > 0 ? `<button class="clear-btn" onclick="clearDone()">완료 ${doneN}개 삭제</button>` : ''}`;
+}
+
+/* ── Todo 이벤트 ── */
+document.getElementById('addBtn').addEventListener('click', () => {
+  const inp = document.getElementById('newTodo');
+  addTodo(inp.value);
+  inp.value = '';
+  inp.focus();
+});
+document.getElementById('newTodo').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('addBtn').click();
+});
+document.querySelectorAll('.pri-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.pri-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    selPri = btn.dataset.p;
+  });
+});
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    filter = btn.dataset.filter;
+    render();
+  });
+});
+document.getElementById('sortBtn').addEventListener('click', () => {
+  sortByPri = !sortByPri;
+  document.getElementById('sortBtn').classList.toggle('active', sortByPri);
+  render();
+});
+
+/* ── Boot ── */
+document.getElementById('dateLabel').textContent =
+  new Date().toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric', weekday:'long' });
+
+(async () => {
+  setStatus('busy', '연결 중...');
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    await onSignedIn(session.user);
+  } else {
+    setStatus('error', '로그인이 필요합니다');
+    showAuthOverlay();
+  }
+
+  // 세션 변화 감지 (이메일 확인 링크 클릭 후 자동 처리)
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && session) {
+      await onSignedIn(session.user);
+    } else if (event === 'SIGNED_OUT') {
+      userId = null; todos = []; render();
+    }
+  });
+})();
+</script>
+</body>
+</html>
