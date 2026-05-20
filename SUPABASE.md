@@ -1,5 +1,7 @@
 # Supabase Todo App — 설정 & 기술 문서
 
+**배포 URL**: https://sarangks2-commits.github.io/todo/
+
 ---
 
 ## 기술 스택
