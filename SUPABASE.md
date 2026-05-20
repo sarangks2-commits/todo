@@ -209,7 +209,18 @@ Authentication → URL Configuration → Redirect URLs → Add URL
 
 ---
 
-## 7. API 키
+## 7. 설정 완료 현황
+
+| Provider | 상태 |
+|----------|------|
+| Email | ✅ 활성화 (Confirm email OFF) |
+| GitHub | ✅ 활성화 완료 |
+| Google | ✅ 활성화 완료 |
+| Redirect URL | ✅ `https://sarangks2-commits.github.io/todo/` 등록 완료 |
+
+---
+
+## 8. API 키
 
 **Project Settings → API**
 
